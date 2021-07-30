@@ -24,9 +24,7 @@ def readfile(filename):
     return fl
 
 
-# Function to create json
-def feature_creator(sentence_id, sentence):
-
+def get_tags(sentence):
     # Word tokenization
     words = word_tokenize(sentence)
 
@@ -34,10 +32,12 @@ def feature_creator(sentence_id, sentence):
     pos_with_words = nltk.pos_tag(words)
 
     # Separating tags & words and saving tags separately
-    tags = []
-    for pos in pos_with_words:
-        tags.append(pos[1])
+    tags = [tag for _, tag in pos_with_words]
 
+    return words, tags
+
+
+def get_preps_idx(words, tags):
     preposition = ["on", "for", "of", "to", "at", "in", "with", "by"]
 
     length = len(words)
@@ -49,6 +49,15 @@ def feature_creator(sentence_id, sentence):
             continue
         if word.lower() in preposition:
             preposition_index.append(ind)
+
+    return preposition_index
+    
+
+# Function to create json
+def feature_creator(sentence_id, sentence):
+    words, tags = get_tags(sentence)
+
+    preposition_index = get_preps_idx(words, tags)
 
     print(preposition_index)
     print(tags)
@@ -104,12 +113,15 @@ def feature_creator(sentence_id, sentence):
 
         # print(output)
 
+def extract_features(df):
+    for i in range(df.shape[0]):
+        feature_creator(df["Id"][i], df["Sentence"][i])
+
 
 if __name__ == "__main__":
-
     filename = sys.argv[1]
-    file = readfile(filename)
+    df = readfile(filename)
+
+    extract_features(df)
 
     # Calling function over csv file
-    for i in range(file.shape[0]):
-        feature_creator(file["Id"][i], file["Sentence"][i])
