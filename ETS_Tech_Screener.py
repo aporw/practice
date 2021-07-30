@@ -1,8 +1,9 @@
 import os
 import sys
-import pandas as pd
 import json
 import nltk
+import pandas as pd
+
 from nltk.tokenize import word_tokenize
 
 # Function to read input file
@@ -51,77 +52,60 @@ def get_preps_idx(words, tags):
             preposition_index.append(ind)
 
     return preposition_index
-    
+
 
 # Function to create json
-def feature_creator(sentence_id, sentence):
+def get_features(sentence):
     words, tags = get_tags(sentence)
 
     preposition_index = get_preps_idx(words, tags)
 
-    print(preposition_index)
-    print(tags)
+    length = len(words)
 
     for i in preposition_index:
-
         w, t = words[i], tags[i]
 
-        # Handling out of index error on both sides of list
-        if i - 1 < 0:
-            wBack1, tBack1 = None, None
-            wBack2, tBack2 = None, None
-        else:
-            wBack1, tBack1 = words[i - 1], tags[i - 1]
-            if i - 2 < 0:
-                wBack2, tBack2 = None, None
-            else:
-                wBack2, tBack2 = words[i - 2], tags[i - 2]
-        if i + 1 > length - 1:
-            wForward1, tForward1 = None, None
-            wForward2, tForward2 = None, None
-        else:
-            wForward1, tForward1 = words[i + 1], tags[i + 1]
-            if i + 2 > length - 1:
-                wForward2, tForward2 = None, None
-            else:
-                wForward2, tForward2 = words[i + 2], tags[i + 2]
+        features_words = []
+        features_tags = []
+        for j in range(1, 3):
+            features_words.append(" ".join(words[max(0, i - j) : i + 1]))
+            features_words.append(" ".join(words[i : min(i + j + 1, length)]))
+            features_words.append(
+                " ".join(words[max(0, i - j) : min(i + j + 1, length)])
+            )
 
-        # Save features in list ls
-        ls = []
+            features_tags.append(" ".join(tags[max(0, i - j) : i + 1]))
+            features_tags.append(" ".join(tags[i : min(i + j + 1, length)]))
+            features_tags.append(" ".join(tags[max(0, i - j) : min(i + j + 1, length)]))
 
-        ls.append(" ".join(filter(None, [wBack1, w])))
-        ls.append(" ".join(filter(None, [w, wForward1])))
-        ls.append(" ".join(filter(None, [wBack1, w, wForward1])))
-        ls.append(" ".join(filter(None, [wBack2, wBack1, w])))
-        ls.append(" ".join(filter(None, [w, wForward1, wForward2])))
-        ls.append(" ".join(filter(None, [wBack2, wBack1, w, wForward1, wForward2])))
-        ls.append(" ".join(filter(None, [tBack1, t])))
-        ls.append(" ".join(filter(None, [t, tForward1])))
-        ls.append(" ".join(filter(None, [tBack1, t, tForward1])))
-        ls.append(" ".join(filter(None, [tBack2, tBack1, t])))
-        ls.append(" ".join(filter(None, [t, tForward1, tForward2])))
-        ls.append(" ".join(filter(None, [tBack2, tBack1, t, tForward1, tForward2])))
+        yield words[i], features_words + features_tags
 
-        output = {}
-        output["id"] = str("_".join([str(sentence_id), str(i)]))
-        output["prep"] = words[i]
-        output["features"] = ls
 
-        # Saving json file with same name as ID
-        with open("Output_Files/" + output["id"] + ".json", "w") as outfile:
-            json.dump(output, outfile)
+def extract_features(df, outfile):
+    df = df[["Id", "Sentence"]]
 
-        # print(output)
+    with open(outfile, "w") as f:
+        for sentence_id, sentence in df.itertuples(index=False):
+            for prep_id, (prep, features) in enumerate(get_features(sentence)):
+                out = json.dumps(
+                    {
+                        "id": f"{sentence_id}_{prep_id}",
+                        "prep": prep,
+                        "features": features,
+                    },
+                    indent=None,
+                )
 
-def extract_features(df):
-    for i in range(df.shape[0]):
-        feature_creator(df["Id"][i], df["Sentence"][i])
+                f.write(out + "\n")
 
 
 if __name__ == "__main__":
-    filename = sys.argv[1]
-    df = readfile(filename)
+    if len(sys.argv) < 3:
+        raise ValueError("required inputfile and outputfile as arguments")
 
-    extract_features(df)
+    infile, outfile = sys.argv[1:3]
+
+    df = readfile(infile)
+    extract_features(df, outfile)
 
     # Calling function over csv file
